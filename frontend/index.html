@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSISDN Numeracija</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3354;
+    --accent: #4f6ef7;
+    --accent2: #7c3aed;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* SIDEBAR */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 230px; background: var(--surface); border-right: 1px solid var(--border);
+             padding: 0; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 10; }
+  .sidebar-logo { padding: 20px 18px; border-bottom: 1px solid var(--border); }
+  .sidebar-logo h1 { font-size: 1.1rem; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+  .sidebar-logo p { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .nav { flex: 1; padding: 10px 0; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 18px;
+              cursor: pointer; color: var(--muted); font-size: 0.88rem; transition: all .15s;
+              border-left: 3px solid transparent; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(79,110,247,.12); color: var(--accent);
+                     border-left-color: var(--accent); }
+  .nav-item .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+  .main { margin-left: 230px; flex: 1; padding: 28px 32px; min-height: 100vh; }
+
+  /* HEADER */
+  .page-header { margin-bottom: 24px; }
+  .page-header h2 { font-size: 1.4rem; font-weight: 700; }
+  .page-header p { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+               padding: 18px; text-align: center; }
+  .stat-card .val { font-size: 2rem; font-weight: 700; }
+  .stat-card .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+  .stat-card.green .val { color: var(--green); }
+  .stat-card.red .val { color: var(--red); }
+  .stat-card.yellow .val { color: var(--yellow); }
+  .stat-card.blue .val { color: var(--accent); }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 7px;
+         font-size: 0.85rem; font-weight: 500; cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3d5ce0; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #16a34a; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--border); }
+  .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+  .btn-warn { background: var(--yellow); color: #111; }
+  .btn-warn:hover { background: #d97706; }
+
+  /* SEARCH */
+  .search-box { position: relative; flex: 1; max-width: 360px; }
+  .search-box input { width: 100%; background: var(--surface2); border: 1px solid var(--border);
+                      color: var(--text); padding: 8px 12px 8px 36px; border-radius: 7px; font-size: 0.85rem; }
+  .search-box input:focus { outline: none; border-color: var(--accent); }
+  .search-box .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+                              color: var(--muted); font-size: 0.9rem; }
+  select { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+           padding: 8px 12px; border-radius: 7px; font-size: 0.85rem; cursor: pointer; }
+  select:focus { outline: none; border-color: var(--accent); }
+
+  /* TABLE */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: var(--surface2); padding: 12px 14px; text-align: left; font-size: 0.78rem;
+       color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(46,51,84,.5); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(79,110,247,.05); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge-green { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,.15); color: var(--red); }
+  .badge-yellow { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .badge-blue { background: rgba(79,110,247,.15); color: var(--accent); }
+  .badge-purple { background: rgba(124,58,237,.15); color: var(--accent2); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100;
+                   display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .hidden { display: none !important; }
+  .modal-overlay.hidden { display: none; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+           width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center;
+                  padding: 18px 22px; border-bottom: 1px solid var(--border); }
+  .modal-header h3 { font-size: 1rem; font-weight: 600; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 1.3rem; cursor: pointer; }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 22px; }
+  .modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* FORM */
+  .form-row { margin-bottom: 16px; }
+  .form-row label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 7px; font-size: 0.88rem;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .form-row textarea { resize: vertical; min-height: 70px; }
+  .form-row .hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* PAGINATION */
+  .pagination { display: flex; gap: 6px; align-items: center; margin-top: 14px; justify-content: center; }
+  .pagination button { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+                        padding: 6px 12px; border-radius: 6px; font-size: 0.82rem; cursor: pointer; }
+  .pagination button:hover:not(:disabled) { background: var(--border); }
+  .pagination button.active { background: var(--accent); border-color: var(--accent); }
+  .pagination button:disabled { opacity: .4; cursor: default; }
+  .pagination .info { font-size: 0.8rem; color: var(--muted); margin: 0 8px; }
+
+  /* EMPTY / LOADING */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+           padding: 12px 18px; font-size: 0.85rem; min-width: 240px; display: flex; align-items: center; gap: 10px;
+           animation: slideIn .2s ease; }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+  .toast.info { border-left: 3px solid var(--accent); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* BREADCRUMB */
+  .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; }
+  .breadcrumb span { cursor: pointer; }
+  .breadcrumb span:hover { color: var(--accent); }
+  .breadcrumb .sep { color: var(--border); }
+  .breadcrumb .current { color: var(--text); cursor: default; }
+
+  /* STATUS DOTS */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .dot-green { background: var(--green); }
+  .dot-red { background: var(--red); }
+  .dot-yellow { background: var(--yellow); }
+
+  /* INFO CARD */
+  .info-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 0.85rem; }
+  .info-row .key { color: var(--muted); min-width: 110px; }
+  .info-banner { background: rgba(79,110,247,.1); border: 1px solid rgba(79,110,247,.3);
+                 border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; font-size: 0.85rem; }
+
+  .actions-cell { display: flex; gap: 5px; }
+
+  input[type=date] { color-scheme: dark; }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h1>📡 MSISDN</h1>
+      <p>Upravljanje numeracijom</p>
+    </div>
+    <div class="nav">
+      <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+        <span class="icon">🏠</span> Pregled
+      </div>
+      <div class="nav-item" onclick="showPage('opcine')" id="nav-opcine">
+        <span class="icon">🏛️</span> Općine
+      </div>
+      <div class="nav-item" onclick="showPage('lokacije')" id="nav-lokacije">
+        <span class="icon">📍</span> Lokacije
+      </div>
+      <div class="nav-item" onclick="showPage('uredjaji')" id="nav-uredjaji">
+        <span class="icon">🔌</span> Uređaji
+      </div>
+      <div class="nav-item" onclick="showPage('rasponi')" id="nav-rasponi">
+        <span class="icon">🔢</span> Rasponi
+      </div>
+      <div class="nav-item" onclick="showPage('msisdn')" id="nav-msisdn">
+        <span class="icon">📱</span> MSISDN Brojevi
+      </div>
+      <div class="nav-item" onclick="showPage('allocation')" id="nav-allocation">
+        <span class="icon">📞</span> Alokacija
+      </div>
+      <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
+        <span class="icon">⚙️</span> Admin
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- DASHBOARD -->
+    <div id="page-dashboard">
+      <div class="page-header">
+        <h2>Pregled sustava</h2>
+        <p>Statistike i brzi pregled stanja numeracije</p>
+      </div>
+      <div id="stats-grid" class="stats-grid">
+        <div class="stat-card"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- OPĆINE -->
+    <div id="page-opcine" class="hidden">
+      <div class="page-header">
+        <h2>🏛️ Općine</h2>
+        <p>Upravljanje općinama</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openOpcina()">+ Nova općina</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Naziv</th><th>Lokacije</th><th>Kreirano</th><th>Akcije</th>
+          </tr></thead>
+            <tbody id="tbl-opcine"><tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOKACIJE -->
+    <div id="page-lokacije" class="hidden">
+      <div class="page-header">
+        <h2>📍 Lokacije</h2>
+        <p>Upravljanje lokacijama unutar općina</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openLokacija()">+ Nova lokacija</button>
+        <select id="filter-lokacija-opcina" onchange="loadLokacije()">
+          <option value="">Sve općine</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Naziv</th><th>Općina</th><th>Adresa</th><th>Uređaji</th><th>Rasponi</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="tbl-lokacije"><tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- UREĐAJI -->
+    <div id="page-uredjaji" class="hidden">
+      <div class="page-header">
+        <h2>🔌 Uređaji</h2>
+        <p>MSAN i GPON OLT uređaji po lokacijama</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openUredjaj()">+ Novi uređaj</button>
+        <select id="filter-uredjaj-lokacija" onchange="loadUredjaji()">
+          <option value="">Sve lokacije</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Naziv</th><th>Tip</th><th>Lokacija</th><th>Općina</th><th>Serijski br.</th><th>Status</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="tbl-uredjaji"><tr><td colspan="8" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RASPONI -->
+    <div id="page-rasponi" class="hidden">
+      <div class="page-header">
+        <h2>🔢 Rasponi MSISDN</h2>
+        <p>Definiranje raspona i generiranje brojeva</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openRaspon()">+ Novi raspon</button>
+        <select id="filter-raspon-lokacija" onchange="loadRasponi()">
+          <option value="">Sve lokacije</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Naziv</th><th>Lokacija</th><th>Od</th><th>Do</th>
+            <th>Ukupno</th><th>Slobodni</th><th>Zauzeti</th><th>Karantena</th><th>Generirano</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="tbl-rasponi"><tr><td colspan="11" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MSISDN BROJEVI -->
+    <div id="page-msisdn" class="hidden">
+      <div class="page-header">
+        <h2>📱 MSISDN Brojevi</h2>
+        <p>Pregled i upravljanje pojedinim brojevima</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openMsisdn()">+ Dodaj broj</button>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="msisdn-search" placeholder="Pretraži broj, ime, OIB..." oninput="debouncedSearch()">
+        </div>
+        <select id="filter-msisdn-raspon" onchange="loadMsisdn(1)">
+          <option value="">Svi rasponi</option>
+        </select>
+        <select id="filter-msisdn-status" onchange="loadMsisdn(1)">
+          <option value="">Svi statusi</option>
+          <option value="slobodan">Slobodan</option>
+          <option value="zauzet">Zauzet</option>
+          <option value="karantena">Karantena</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>MSISDN</th><th>Status</th><th>Ime i Prezime</th><th>OIB</th>
+            <th>Datum dodjele</th><th>Lokacija</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="tbl-msisdn"><tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+      <div id="msisdn-pagination" class="pagination"></div>
+    </div>
+
+    <!-- ALOKACIJA -->
+    <div id="page-allocation" class="hidden">
+      <div class="page-header">
+        <h2>📞 Alokacija broja</h2>
+        <p>Dodijelite novi MSISDN broj unosom poštanskog broja</p>
+      </div>
+      <div class="card">
+        <div class="form-row">
+          <label>Poštanski broj *</label>
+          <input type="text" id="alloc-postal" placeholder="npr. 78000" maxlength="10">
+        </div>
+        <button class="btn btn-primary" onclick="resolveLocation()">Provjeri lokaciju</button>
+        <div id="alloc-preview" class="hidden" style="margin-top: 20px; padding: 15px; background: var(--surface); border-radius: var(--radius);">
+          <h4>Rezultat:</h4>
+          <p id="alloc-location"></p>
+          <button class="btn btn-success" onclick="allocateNumber()">Dodijeli broj</button>
+        </div>
+        <div id="alloc-result" class="hidden" style="margin-top: 20px; padding: 15px; background: var(--green); color: white; border-radius: var(--radius);">
+          <h4>Broj dodijeljen!</h4>
+          <p id="alloc-number"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="page-admin" class="hidden">
+      <div class="page-header">
+        <h2>⚙️ Administracija</h2>
+        <p>Upravljanje poštanskim kodovima i rutiranjem</p>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openPostalCode()">+ Dodaj poštanski kod</button>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="postal-search" placeholder="Pretraži poštanski broj..." oninput="debouncedSearchPostal()">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Poštanski broj</th><th>Naziv pošte</th><th>Općina</th><th>Default lokacija</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="tbl-postal"><tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+      <div id="postal-pagination" class="pagination"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ====== MODALI ====== -->
+
+<!-- Modal: Općina -->
+<div id="modal-opcina" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-opcina-title">Nova općina</h3>
+      <button class="modal-close" onclick="closeModal('modal-opcina')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="opcina-id">
+      <div class="form-row">
+        <label>Regija *</label>
+        <select id="opcina-region-id">
+          <option value="1">Republika Srpska</option>
+          <option value="2">Brčko Distrikt</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Naziv općine *</label>
+        <input type="text" id="opcina-naziv" placeholder="npr. Banja Luka">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-opcina')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveOpcina()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Lokacija -->
+<div id="modal-lokacija" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-lokacija-title">Nova lokacija</h3>
+      <button class="modal-close" onclick="closeModal('modal-lokacija')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="lokacija-id">
+      <div class="form-row">
+        <label>Općina *</label>
+        <select id="lokacija-opcina-id"></select>
+      </div>
+      <div class="form-row">
+        <label>Naziv lokacije *</label>
+        <input type="text" id="lokacija-naziv" placeholder="npr. Centar Zagreb">
+      </div>
+      <div class="form-row">
+        <label>Adresa</label>
+        <input type="text" id="lokacija-adresa" placeholder="npr. Ilica 1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-lokacija')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveLokacija()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Uređaj -->
+<div id="modal-uredjaj" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-uredjaj-title">Novi uređaj</h3>
+      <button class="modal-close" onclick="closeModal('modal-uredjaj')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="uredjaj-id">
+      <div class="form-row">
+        <label>Lokacija *</label>
+        <select id="uredjaj-lokacija-id"></select>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Naziv uređaja *</label>
+          <input type="text" id="uredjaj-naziv" placeholder="npr. MSAN-ZG-01">
+        </div>
+        <div class="form-row">
+          <label>Tip uređaja *</label>
+          <select id="uredjaj-tip">
+            <option value="MSAN">MSAN</option>
+            <option value="GPON_OLT">GPON OLT</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Serijski broj</label>
+        <input type="text" id="uredjaj-serijski" placeholder="npr. SN123456">
+      </div>
+      <div class="form-row">
+        <label>Status</label>
+        <select id="uredjaj-aktivan">
+          <option value="1">Aktivan</option>
+          <option value="0">Neaktivan</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-uredjaj')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveUredjaj()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Raspon -->
+<div id="modal-raspon" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-raspon-title">Novi raspon MSISDN</h3>
+      <button class="modal-close" onclick="closeModal('modal-raspon')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="raspon-id">
+      <div class="form-row">
+        <label>Lokacija *</label>
+        <select id="raspon-lokacija-id"></select>
+      </div>
+      <div class="form-row">
+        <label>Naziv raspona</label>
+        <input type="text" id="raspon-naziv" placeholder="npr. Blok A - Zagreb Centar">
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>MSISDN od *</label>
+          <input type="text" id="raspon-od" placeholder="38591100000">
+          <div class="hint">Samo znamenke, bez razmaka</div>
+        </div>
+        <div class="form-row">
+          <label>MSISDN do *</label>
+          <input type="text" id="raspon-do" placeholder="38591199999">
+        </div>
+      </div>
+      <div class="info-banner">
+        ℹ️ Nakon kreiranja raspona, koristite <strong>Generiraj brojeve</strong> za masovno kreiranje svih MSISDN-ova. Max 100.000 po operaciji.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-raspon')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveRaspon()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: MSISDN uredi -->
+<div id="modal-msisdn" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-msisdn-title">Uredi MSISDN</h3>
+      <button class="modal-close" onclick="closeModal('modal-msisdn')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="msisdn-edit-id">
+      <div class="form-row">
+        <label>MSISDN broj</label>
+        <input type="text" id="msisdn-edit-broj" disabled style="opacity:.5">
+      </div>
+      <div class="form-row">
+        <label>Status *</label>
+        <select id="msisdn-edit-status" onchange="toggleMsisdnFields()">
+          <option value="slobodan">🟢 Slobodan</option>
+          <option value="zauzet">🔴 Zauzet</option>
+          <option value="karantena">🟡 Karantena</option>
+        </select>
+      </div>
+      <div id="msisdn-korisnik-fields">
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Ime</label>
+            <input type="text" id="msisdn-edit-ime" placeholder="Ime korisnika">
+          </div>
+          <div class="form-row">
+            <label>Prezime</label>
+            <input type="text" id="msisdn-edit-prezime" placeholder="Prezime korisnika">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>OIB</label>
+          <input type="text" id="msisdn-edit-oib" placeholder="11 znamenki" maxlength="11">
+          <div class="hint">Obvezno za zauzete brojeve</div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Datum dodjele</label>
+            <input type="date" id="msisdn-edit-datum-dodjele">
+          </div>
+          <div class="form-row" id="karantena-datum-wrap">
+            <label>Datum karantene</label>
+            <input type="date" id="msisdn-edit-datum-karantene">
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Napomena</label>
+        <textarea id="msisdn-edit-napomena" placeholder="Opcionalna napomena..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-msisdn')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveMsisdn()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novi MSISDN -->
+<div id="modal-msisdn-new" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Dodaj pojedinačni MSISDN</h3>
+      <button class="modal-close" onclick="closeModal('modal-msisdn-new')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>Raspon *</label>
+        <select id="msisdn-new-raspon"></select>
+      </div>
+      <div class="form-row">
+        <label>MSISDN broj *</label>
+        <input type="text" id="msisdn-new-broj" placeholder="npr. 385911234567">
+        <div class="hint">Samo znamenke</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-msisdn-new')">Odustani</button>
+      <button class="btn btn-primary" onclick="saveNewMsisdn()">Dodaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Poštanski kod -->
+<div id="modal-postal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-postal-title">Novi poštanski kod</h3>
+      <button class="modal-close" onclick="closeModal('modal-postal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="postal-id">
+      <div class="form-row">
+        <label>Općina *</label>
+        <select id="postal-opcina-id"></select>
+      </div>
+      <div class="form-row">
+        <label>Poštanski broj *</label>
+        <input type="text" id="postal-broj" placeholder="npr. 78000" maxlength="10">
+      </div>
+      <div class="form-row">
+        <label>Naziv pošte *</label>
+        <input type="text" id="postal-naziv" placeholder="npr. Banja Luka">
+      </div>
+      <div class="form-row">
+        <label>Default lokacija</label>
+        <select id="postal-default-lokacija">
+          <option value="">Nema</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-postal')">Odustani</button>
+      <button class="btn btn-primary" onclick="savePostalCode()">Spremi</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script>
+const API = (() => {
+  if (window.location.protocol === 'file:') return 'http://127.0.0.1:8000';
+  return `${window.location.protocol}//${window.location.hostname}:8000`;
+})();
+let msisdnPage = 1;
+let searchTimer = null;
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (r.status === 204) return null;
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || 'Greška');
+  return data;
+}
+
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = { success:'✅', error:'❌', info:'ℹ️' };
+  el.innerHTML = `<span>${icons[type]}</span> ${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+
+function showPage(name) {
+  document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + name).classList.remove('hidden');
+  document.getElementById('nav-' + name).classList.add('active');
+  const loaders = { dashboard: loadDashboard, opcine: loadOpcine, lokacije: loadLokacije,
+                    uredjaji: loadUredjaji, rasponi: loadRasponi, msisdn: () => loadMsisdn(1),
+                    allocation: () => {}, admin: () => loadPostalCodes(1) };
+  if (loaders[name]) loaders[name]();
+}
+
+function statusBadge(s) {
+  const map = {
+    slobodan: ['badge-green', '🟢 Slobodan'],
+    zauzet: ['badge-red', '🔴 Zauzet'],
+    karantena: ['badge-yellow', '🟡 Karantena'],
+  };
+  const [cls, txt] = map[s] || ['badge-blue', s];
+  return `<span class="badge ${cls}">${txt}</span>`;
+}
+
+function tipBadge(t) {
+  return t === 'MSAN'
+    ? `<span class="badge badge-blue">MSAN</span>`
+    : `<span class="badge badge-purple">GPON OLT</span>`;
+}
+
+function confirmDel(msg, fn) {
+  if (confirm(msg)) fn();
+}
+
+function debouncedSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadMsisdn(1), 400);
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────────────────
+
+async function loadDashboard() {
+  try {
+    const s = await api('GET', '/statistike');
+    const pct = s.ukupno_msisdn ? Math.round(s.zauzeti / s.ukupno_msisdn * 100) : 0;
+    document.getElementById('stats-grid').innerHTML = `
+      <div class="stat-card blue"><div class="val">${s.opcine}</div><div class="lbl">🏛️ Općine</div></div>
+      <div class="stat-card blue"><div class="val">${s.lokacije}</div><div class="lbl">📍 Lokacije</div></div>
+      <div class="stat-card blue"><div class="val">${s.uredjaji}</div><div class="lbl">🔌 Uređaji</div></div>
+      <div class="stat-card blue"><div class="val">${s.rasponi}</div><div class="lbl">🔢 Rasponi</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--text)">${s.ukupno_msisdn.toLocaleString()}</div><div class="lbl">📱 Ukupno MSISDN</div></div>
+      <div class="stat-card green"><div class="val">${s.slobodni.toLocaleString()}</div><div class="lbl">🟢 Slobodni</div></div>
+      <div class="stat-card red"><div class="val">${s.zauzeti.toLocaleString()}</div><div class="lbl">🔴 Zauzeti</div></div>
+      <div class="stat-card yellow"><div class="val">${s.karantena.toLocaleString()}</div><div class="lbl">🟡 Karantena</div></div>
+      <div class="stat-card"><div class="val" style="color:var(--text)">${pct}%</div><div class="lbl">📊 Iskoristivost</div></div>
+    `;
+  } catch(e) { toast('Greška pri učitavanju statistike', 'error'); }
+}
+
+// ── OPĆINE ───────────────────────────────────────────────────────────────────
+
+async function loadOpcine() {
+  const tbody = document.getElementById('tbl-opcine');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr>';
+  try {
+    const rows = await api('GET', '/opcine');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="icon">🏛️</div>Nema općina</div></td></tr>'; return; }
+    tbody.innerHTML = rows.map(o => `
+      <tr>
+        <td><code>${o.id}</code></td>
+        <td><strong>${o.naziv}</strong></td>
+        <td><span class="badge badge-blue">${o.broj_lokacija}</span></td>
+        <td style="color:var(--muted);font-size:.8rem">${o.created_at?.split('T')[0] || ''}</td>
+        <td class="actions-cell">
+          <button class="btn btn-ghost btn-sm" onclick="editOpcina(${o.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteOpcina(${o.id},'${o.naziv}')">🗑️</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:20px">${e.message}</td></tr>`; }
+}
+
+function openOpcina() {
+  document.getElementById('opcina-id').value = '';
+  document.getElementById('opcina-naziv').value = '';
+  document.getElementById('opcina-region-id').value = '1'; // Default RS
+  document.getElementById('modal-opcina-title').textContent = 'Nova općina';
+  openModal('modal-opcina');
+}
+
+async function editOpcina(id) {
+  try {
+    const o = await api('GET', `/opcine/${id}`);
+    document.getElementById('opcina-id').value = o.id;
+    document.getElementById('opcina-naziv').value = o.naziv;
+    document.getElementById('opcina-region-id').value = o.region_id;
+    document.getElementById('modal-opcina-title').textContent = 'Uredi općinu';
+    openModal('modal-opcina');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function saveOpcina() {
+  const id = document.getElementById('opcina-id').value;
+  const body = { 
+    naziv: document.getElementById('opcina-naziv').value.trim(),
+    region_id: parseInt(document.getElementById('opcina-region-id').value)
+  };
+  if (!body.naziv) { toast('Naziv je obavezan', 'error'); return; }
+  try {
+    if (id) await api('PUT', `/opcine/${id}`, body);
+    else await api('POST', '/opcine', body);
+    closeModal('modal-opcina');
+    toast('Općina spremljena ✓', 'success');
+    loadOpcine();
+    refreshOpcinaSelects();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteOpcina(id, naziv) {
+  confirmDel(`Obrisati općinu "${naziv}"? Bit će obrisane sve lokacije, uređaji i rasponi!`, async () => {
+    try { await api('DELETE', `/opcine/${id}`); toast('Općina obrisana', 'success'); loadOpcine(); refreshOpcinaSelects(); }
+    catch(e) { toast(e.message, 'error'); }
+  });
+}
+
+// ── LOKACIJE ─────────────────────────────────────────────────────────────────
+
+async function loadLokacije() {
+  const tbody = document.getElementById('tbl-lokacije');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>';
+  const opcinaId = document.getElementById('filter-lokacija-opcina').value;
+  try {
+    const rows = await api('GET', `/lokacije${opcinaId ? '?opcina_id=' + opcinaId : ''}`);
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">📍</div>Nema lokacija</div></td></tr>'; return; }
+    tbody.innerHTML = rows.map(l => `
+      <tr>
+        <td><code>${l.id}</code></td>
+        <td><strong>${l.naziv}</strong></td>
+        <td>${l.opcina_naziv}</td>
+        <td style="color:var(--muted)">${l.adresa || '—'}</td>
+        <td><span class="badge badge-blue">${l.broj_uredjaja}</span></td>
+        <td><span class="badge badge-purple">${l.broj_raspona}</span></td>
+        <td class="actions-cell">
+          <button class="btn btn-ghost btn-sm" onclick="editLokacija(${l.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteLokacija(${l.id},'${l.naziv}')">🗑️</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${e.message}</td></tr>`; }
+}
+
+async function openLokacija() {
+  document.getElementById('lokacija-id').value = '';
+  document.getElementById('lokacija-naziv').value = '';
+  document.getElementById('lokacija-adresa').value = '';
+  if (!(await populateLokacijaOpcine())) {
+    toast('Prvo dodajte općinu', 'info');
+    return;
+  }
+  document.getElementById('modal-lokacija-title').textContent = 'Nova lokacija';
+  openModal('modal-lokacija');
+}
+
+async function editLokacija(id) {
+  try {
+    const l = await api('GET', `/lokacije/${id}`);
+    await populateLokacijaOpcine(l.opcina_id);
+    document.getElementById('lokacija-id').value = l.id;
+    document.getElementById('lokacija-naziv').value = l.naziv;
+    document.getElementById('lokacija-adresa').value = l.adresa || '';
+    document.getElementById('modal-lokacija-title').textContent = 'Uredi lokaciju';
+    openModal('modal-lokacija');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function populateLokacijaOpcine(selectedId) {
+  const opcine = await api('GET', '/opcine');
+  const sel = document.getElementById('lokacija-opcina-id');
+  if (!opcine.length) {
+    sel.innerHTML = '<option value="">Prvo dodajte općinu</option>';
+    return false;
+  }
+  sel.innerHTML = opcine.map(o => `<option value="${o.id}" ${o.id == selectedId ? 'selected' : ''}>${o.naziv}</option>`).join('');
+  return true;
+}
+
+async function saveLokacija() {
+  const id = document.getElementById('lokacija-id').value;
+  const body = {
+    opcina_id: parseInt(document.getElementById('lokacija-opcina-id').value),
+    naziv: document.getElementById('lokacija-naziv').value.trim(),
+    adresa: document.getElementById('lokacija-adresa').value.trim() || null
+  };
+  if (!body.naziv) { toast('Naziv je obavezan', 'error'); return; }
+  try {
+    if (id) await api('PUT', `/lokacije/${id}`, body);
+    else await api('POST', '/lokacije', body);
+    closeModal('modal-lokacija');
+    toast('Lokacija spremljena ✓', 'success');
+    loadLokacije();
+    refreshLokacijaSelects();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteLokacija(id, naziv) {
+  confirmDel(`Obrisati lokaciju "${naziv}"?`, async () => {
+    try { await api('DELETE', `/lokacije/${id}`); toast('Lokacija obrisana', 'success'); loadLokacije(); refreshLokacijaSelects(); }
+    catch(e) { toast(e.message, 'error'); }
+  });
+}
+
+// ── UREĐAJI ──────────────────────────────────────────────────────────────────
+
+async function loadUredjaji() {
+  const tbody = document.getElementById('tbl-uredjaji');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading"><div class="spinner"></div></td></tr>';
+  const lokId = document.getElementById('filter-uredjaj-lokacija').value;
+  try {
+    const rows = await api('GET', `/uredjaji${lokId ? '?lokacija_id=' + lokId : ''}`);
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="icon">🔌</div>Nema uređaja</div></td></tr>'; return; }
+    tbody.innerHTML = rows.map(u => `
+      <tr>
+        <td><code>${u.id}</code></td>
+        <td><strong>${u.naziv}</strong></td>
+        <td>${tipBadge(u.tip)}</td>
+        <td>${u.lokacija_naziv}</td>
+        <td style="color:var(--muted)">${u.opcina_naziv}</td>
+        <td style="color:var(--muted);font-family:monospace">${u.serijski_broj || '—'}</td>
+        <td>${u.aktivan ? '<span class="badge badge-green">Aktivan</span>' : '<span class="badge" style="background:rgba(100,116,139,.15);color:var(--muted)">Neaktivan</span>'}</td>
+        <td class="actions-cell">
+          <button class="btn btn-ghost btn-sm" onclick="editUredjaj(${u.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUredjaj(${u.id},'${u.naziv}')">🗑️</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:20px">${e.message}</td></tr>`; }
+}
+
+async function openUredjaj() {
+  document.getElementById('uredjaj-id').value = '';
+  document.getElementById('uredjaj-naziv').value = '';
+  document.getElementById('uredjaj-serijski').value = '';
+  document.getElementById('uredjaj-tip').value = 'MSAN';
+  document.getElementById('uredjaj-aktivan').value = '1';
+  if (!(await populateUredjajLokacije())) {
+    toast('Prvo dodajte lokaciju', 'info');
+    return;
+  }
+  document.getElementById('modal-uredjaj-title').textContent = 'Novi uređaj';
+  openModal('modal-uredjaj');
+}
+
+async function editUredjaj(id) {
+  try {
+    const u = await api('GET', `/uredjaji/${id}`);
+    await populateUredjajLokacije(u.lokacija_id);
+    document.getElementById('uredjaj-id').value = u.id;
+    document.getElementById('uredjaj-naziv').value = u.naziv;
+    document.getElementById('uredjaj-tip').value = u.tip;
+    document.getElementById('uredjaj-serijski').value = u.serijski_broj || '';
+    document.getElementById('uredjaj-aktivan').value = u.aktivan.toString();
+    document.getElementById('modal-uredjaj-title').textContent = 'Uredi uređaj';
+    openModal('modal-uredjaj');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function populateUredjajLokacije(selectedId) {
+  const loks = await api('GET', '/lokacije');
+  const sel = document.getElementById('uredjaj-lokacija-id');
+  if (!loks.length) {
+    sel.innerHTML = '<option value="">Prvo dodajte lokaciju</option>';
+    return false;
+  }
+  sel.innerHTML = loks.map(l => `<option value="${l.id}" ${l.id == selectedId ? 'selected' : ''}>${l.naziv} (${l.opcina_naziv})</option>`).join('');
+  return true;
+}
+
+async function saveUredjaj() {
+  const id = document.getElementById('uredjaj-id').value;
+  const body = {
+    lokacija_id: parseInt(document.getElementById('uredjaj-lokacija-id').value),
+    naziv: document.getElementById('uredjaj-naziv').value.trim(),
+    tip: document.getElementById('uredjaj-tip').value,
+    serijski_broj: document.getElementById('uredjaj-serijski').value.trim() || null,
+    aktivan: parseInt(document.getElementById('uredjaj-aktivan').value)
+  };
+  if (!body.naziv) { toast('Naziv je obavezan', 'error'); return; }
+  try {
+    if (id) await api('PUT', `/uredjaji/${id}`, body);
+    else await api('POST', '/uredjaji', body);
+    closeModal('modal-uredjaj');
+    toast('Uređaj spremljen ✓', 'success');
+    loadUredjaji();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteUredjaj(id, naziv) {
+  confirmDel(`Obrisati uređaj "${naziv}"?`, async () => {
+    try { await api('DELETE', `/uredjaji/${id}`); toast('Uređaj obrisan', 'success'); loadUredjaji(); }
+    catch(e) { toast(e.message, 'error'); }
+  });
+}
+
+// ── RASPONI ──────────────────────────────────────────────────────────────────
+
+async function loadRasponi() {
+  const tbody = document.getElementById('tbl-rasponi');
+  tbody.innerHTML = '<tr><td colspan="11" class="loading"><div class="spinner"></div></td></tr>';
+  const lokId = document.getElementById('filter-raspon-lokacija').value;
+  try {
+    const rows = await api('GET', `/rasponi${lokId ? '?lokacija_id=' + lokId : ''}`);
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="11"><div class="empty"><div class="icon">🔢</div>Nema raspona</div></td></tr>'; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><code>${r.id}</code></td>
+        <td>${r.naziv || '—'}</td>
+        <td>${r.lokacija_naziv} <span style="color:var(--muted);font-size:.8rem">(${r.opcina_naziv})</span></td>
+        <td style="font-family:monospace;font-size:.82rem">${r.msisdn_od}</td>
+        <td style="font-family:monospace;font-size:.82rem">${r.msisdn_do}</td>
+        <td><strong>${(r.ukupno||0).toLocaleString()}</strong></td>
+        <td style="color:var(--green)">${(r.slobodni||0).toLocaleString()}</td>
+        <td style="color:var(--red)">${(r.zauzeti||0).toLocaleString()}</td>
+        <td style="color:var(--yellow)">${(r.karantena||0).toLocaleString()}</td>
+        <td>${r.generirano ? '<span class="badge badge-green">Da</span>' : '<span class="badge" style="background:rgba(100,116,139,.15);color:var(--muted)">Ne</span>'}</td>
+        <td class="actions-cell">
+          ${!r.generirano ? `<button class="btn btn-success btn-sm" onclick="generirajBrojeve(${r.id}, ${parseInt(r.msisdn_do)-parseInt(r.msisdn_od)+1})" title="Generiraj sve brojeve">⚡ Generiraj</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="editRaspon(${r.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteRaspon(${r.id})">🗑️</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="11" style="color:var(--red);padding:20px">${e.message}</td></tr>`; }
+}
+
+async function openRaspon() {
+  document.getElementById('raspon-id').value = '';
+  document.getElementById('raspon-naziv').value = '';
+  document.getElementById('raspon-od').value = '';
+  document.getElementById('raspon-do').value = '';
+  if (!(await populateRasponLokacije())) {
+    toast('Prvo dodajte lokaciju', 'info');
+    return;
+  }
+  document.getElementById('modal-raspon-title').textContent = 'Novi raspon MSISDN';
+  openModal('modal-raspon');
+}
+
+async function editRaspon(id) {
+  try {
+    const r = await api('GET', `/rasponi/${id}`);
+    await populateRasponLokacije(r.lokacija_id);
+    document.getElementById('raspon-id').value = r.id;
+    document.getElementById('raspon-naziv').value = r.naziv || '';
+    document.getElementById('raspon-od').value = r.msisdn_od;
+    document.getElementById('raspon-do').value = r.msisdn_do;
+    document.getElementById('modal-raspon-title').textContent = 'Uredi raspon';
+    openModal('modal-raspon');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function populateRasponLokacije(selectedId) {
+  const loks = await api('GET', '/lokacije');
+  const sel = document.getElementById('raspon-lokacija-id');
+  if (!loks.length) {
+    sel.innerHTML = '<option value="">Prvo dodajte lokaciju</option>';
+    return false;
+  }
+  sel.innerHTML = loks.map(l => `<option value="${l.id}" ${l.id == selectedId ? 'selected' : ''}>${l.naziv} (${l.opcina_naziv})</option>`).join('');
+  return true;
+}
+
+async function saveRaspon() {
+  const id = document.getElementById('raspon-id').value;
+  const body = {
+    lokacija_id: parseInt(document.getElementById('raspon-lokacija-id').value),
+    naziv: document.getElementById('raspon-naziv').value.trim() || null,
+    msisdn_od: document.getElementById('raspon-od').value.trim(),
+    msisdn_do: document.getElementById('raspon-do').value.trim()
+  };
+  if (!body.msisdn_od || !body.msisdn_do) { toast('MSISDN od i do su obavezni', 'error'); return; }
+  try {
+    if (id) await api('PUT', `/rasponi/${id}`, body);
+    else await api('POST', '/rasponi', body);
+    closeModal('modal-raspon');
+    toast('Raspon spremljen ✓', 'success');
+    loadRasponi();
+    refreshRasponSelects();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function generirajBrojeve(id, count) {
+  if (!confirm(`Generirati ${count.toLocaleString()} MSISDN brojeva? Ova operacija može potrajati.`)) return;
+  try {
+    const r = await api('POST', `/rasponi/${id}/generiraj`);
+    toast(`${r.poruka} ✓`, 'success');
+    loadRasponi();
+    loadDashboard();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteRaspon(id) {
+  confirmDel('Obrisati raspon i SVE generirane MSISDN brojeve?', async () => {
+    try { await api('DELETE', `/rasponi/${id}`); toast('Raspon obrisan', 'success'); loadRasponi(); refreshRasponSelects(); }
+    catch(e) { toast(e.message, 'error'); }
+  });
+}
+
+// ── MSISDN ────────────────────────────────────────────────────────────────────
+
+async function loadMsisdn(page) {
+  msisdnPage = page || 1;
+  const tbody = document.getElementById('tbl-msisdn');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>';
+  const rasponId = document.getElementById('filter-msisdn-raspon').value;
+  const status = document.getElementById('filter-msisdn-status').value;
+  const search = document.getElementById('msisdn-search').value.trim();
+  let qs = `?page=${msisdnPage}&per_page=50`;
+  if (rasponId) qs += `&raspon_id=${rasponId}`;
+  if (status) qs += `&status=${status}`;
+  if (search) qs += `&search=${encodeURIComponent(search)}`;
+  try {
+    const res = await api('GET', `/msisdn${qs}`);
+    if (!res.data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">📱</div>Nema rezultata</div></td></tr>'; renderPagination(res); return; }
+    tbody.innerHTML = res.data.map(m => `
+      <tr>
+        <td style="font-family:monospace;font-weight:600">${m.msisdn}</td>
+        <td>${statusBadge(m.status)}</td>
+        <td>${m.ime || m.prezime ? `${m.ime||''} ${m.prezime||''}`.trim() : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="font-family:monospace;font-size:.82rem">${m.oib || '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="color:var(--muted);font-size:.82rem">${m.datum_dodjele || '—'}</td>
+        <td style="font-size:.82rem">${m.lokacija_naziv} <span style="color:var(--muted)">(${m.opcina_naziv})</span></td>
+        <td class="actions-cell">
+          <button class="btn btn-ghost btn-sm" onclick="editMsisdn(${m.id})">✏️ Uredi</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMsisdn(${m.id}, '${m.msisdn}')">🗑️</button>
+        </td>
+      </tr>`).join('');
+    renderPagination(res);
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${e.message}</td></tr>`; }
+}
+
+function renderPagination(res) {
+  const el = document.getElementById('msisdn-pagination');
+  if (res.pages <= 1) { el.innerHTML = ''; return; }
+  let html = `<button onclick="loadMsisdn(${res.page-1})" ${res.page<=1?'disabled':''}>‹ Preth.</button>`;
+  const start = Math.max(1, res.page-2), end = Math.min(res.pages, res.page+2);
+  if (start > 1) html += `<button onclick="loadMsisdn(1)">1</button>${start>2?'<span class="info">…</span>':''}`;
+  for (let p=start; p<=end; p++) html += `<button class="${p===res.page?'active':''}" onclick="loadMsisdn(${p})">${p}</button>`;
+  if (end < res.pages) html += `${end<res.pages-1?'<span class="info">…</span>':''}<button onclick="loadMsisdn(${res.pages})">${res.pages}</button>`;
+  html += `<button onclick="loadMsisdn(${res.page+1})" ${res.page>=res.pages?'disabled':''}>Sljed. ›</button>`;
+  html += `<span class="info">Ukupno: ${res.total.toLocaleString()} br.</span>`;
+  el.innerHTML = html;
+}
+
+function toggleMsisdnFields() {
+  const status = document.getElementById('msisdn-edit-status').value;
+  const fields = document.getElementById('msisdn-korisnik-fields');
+  const karWrap = document.getElementById('karantena-datum-wrap');
+  fields.style.display = status === 'slobodan' ? 'none' : '';
+  karWrap.style.display = status === 'karantena' ? '' : 'none';
+}
+
+async function editMsisdn(id) {
+  try {
+    const m = await api('GET', `/msisdn/${id}`);
+    document.getElementById('msisdn-edit-id').value = m.id;
+    document.getElementById('msisdn-edit-broj').value = m.msisdn;
+    document.getElementById('msisdn-edit-status').value = m.status;
+    document.getElementById('msisdn-edit-ime').value = m.ime || '';
+    document.getElementById('msisdn-edit-prezime').value = m.prezime || '';
+    document.getElementById('msisdn-edit-oib').value = m.oib || '';
+    document.getElementById('msisdn-edit-datum-dodjele').value = m.datum_dodjele || '';
+    document.getElementById('msisdn-edit-datum-karantene').value = m.datum_karantene || '';
+    document.getElementById('msisdn-edit-napomena').value = m.napomena || '';
+    toggleMsisdnFields();
+    document.getElementById('modal-msisdn-title').textContent = `Uredi: ${m.msisdn}`;
+    openModal('modal-msisdn');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function saveMsisdn() {
+  const id = document.getElementById('msisdn-edit-id').value;
+  const status = document.getElementById('msisdn-edit-status').value;
+  const body = {
+    status,
+    ime: document.getElementById('msisdn-edit-ime').value.trim() || null,
+    prezime: document.getElementById('msisdn-edit-prezime').value.trim() || null,
+    oib: document.getElementById('msisdn-edit-oib').value.trim() || null,
+    datum_dodjele: document.getElementById('msisdn-edit-datum-dodjele').value || null,
+    datum_karantene: document.getElementById('msisdn-edit-datum-karantene').value || null,
+    napomena: document.getElementById('msisdn-edit-napomena').value.trim() || null
+  };
+  try {
+    await api('PUT', `/msisdn/${id}`, body);
+    closeModal('modal-msisdn');
+    toast('MSISDN ažuriran ✓', 'success');
+    loadMsisdn(msisdnPage);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function openMsisdn() {
+  const rasponi = await api('GET', '/rasponi');
+  if (!rasponi.length) {
+    toast('Prvo dodajte raspon', 'info');
+    return;
+  }
+  const sel = document.getElementById('msisdn-new-raspon');
+  sel.innerHTML = rasponi.map(r => `<option value="${r.id}">${r.msisdn_od} – ${r.msisdn_do} (${r.lokacija_naziv})</option>`).join('');
+  document.getElementById('msisdn-new-broj').value = '';
+  openModal('modal-msisdn-new');
+}
+
+async function saveNewMsisdn() {
+  const body = {
+    raspon_id: parseInt(document.getElementById('msisdn-new-raspon').value),
+    msisdn: document.getElementById('msisdn-new-broj').value.trim()
+  };
+  if (!body.msisdn) { toast('MSISDN je obavezan', 'error'); return; }
+  try {
+    await api('POST', '/msisdn', body);
+    closeModal('modal-msisdn-new');
+    toast('MSISDN dodan ✓', 'success');
+    loadMsisdn(1);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteMsisdn(id, msisdn) {
+  confirmDel(`Obrisati MSISDN ${msisdn}?`, async () => {
+    try { await api('DELETE', `/msisdn/${id}`); toast('MSISDN obrisan', 'success'); loadMsisdn(msisdnPage); }
+    catch(e) { toast(e.message, 'error'); }
+  });
+}
+
+// ── SELECTS REFRESH ───────────────────────────────────────────────────────────
+
+async function refreshOpcinaSelects() {
+  const opcine = await api('GET', '/opcine');
+  const opts = opcine.map(o => `<option value="${o.id}">${o.naziv}</option>`).join('');
+  document.getElementById('filter-lokacija-opcina').innerHTML = '<option value="">Sve općine</option>' + opts;
+}
+
+async function refreshLokacijaSelects() {
+  const loks = await api('GET', '/lokacije');
+  const opts = loks.map(l => `<option value="${l.id}">${l.naziv} (${l.opcina_naziv})</option>`).join('');
+  document.getElementById('filter-uredjaj-lokacija').innerHTML = '<option value="">Sve lokacije</option>' + opts;
+  document.getElementById('filter-raspon-lokacija').innerHTML = '<option value="">Sve lokacije</option>' + opts;
+}
+
+async function refreshRasponSelects() {
+  const rasponi = await api('GET', '/rasponi');
+  const opts = rasponi.map(r => `<option value="${r.id}">${r.msisdn_od}–${r.msisdn_do} (${r.lokacija_naziv})</option>`).join('');
+  document.getElementById('filter-msisdn-raspon').innerHTML = '<option value="">Svi rasponi</option>' + opts;
+}
+
+async function resolveLocation() {
+  const postal = document.getElementById('alloc-postal').value.trim();
+  if (!postal) { toast('Unesite poštanski broj', 'error'); return; }
+  try {
+    // To resolve, we can use the postal codes API to find the default location
+    const codes = await api('GET', `/postal-codes?search=${encodeURIComponent(postal)}`);
+    const code = codes.data.find(c => c.postanski_broj === postal);
+    if (!code) { toast('Poštanski broj nije pronađen', 'error'); return; }
+    if (!code.default_lokacija_id) { toast('Poštanski broj nema konfigurisanu default lokaciju', 'error'); return; }
+    document.getElementById('alloc-location').textContent = `${code.opcina_naziv} - ${code.default_lokacija_naziv}`;
+    document.getElementById('alloc-preview').classList.remove('hidden');
+    document.getElementById('alloc-result').classList.add('hidden');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function allocateNumber() {
+  const postal = document.getElementById('alloc-postal').value.trim();
+  try {
+    const result = await api('POST', '/assignments/allocate', { postal_code: postal });
+    document.getElementById('alloc-number').textContent = `Dodijeljen broj: ${result.msisdn} (${result.lokacija_naziv}, ${result.opcina_naziv}, ${result.region_naziv})`;
+    document.getElementById('alloc-result').classList.remove('hidden');
+    document.getElementById('alloc-preview').classList.add('hidden');
+    toast('Broj uspješno dodijeljen!', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// Admin functions
+let postalPage = 1;
+let postalSearchTimer = null;
+
+function debouncedSearchPostal() {
+  clearTimeout(postalSearchTimer);
+  postalSearchTimer = setTimeout(() => loadPostalCodes(1), 300);
+}
+
+async function loadPostalCodes(page) {
+  postalPage = page;
+  const search = document.getElementById('postal-search').value.trim();
+  try {
+    const data = await api('GET', `/postal-codes?search=${encodeURIComponent(search)}&page=${page}&per_page=50`);
+    const tbody = document.getElementById('tbl-postal');
+    tbody.innerHTML = data.data.map(p => `
+      <tr>
+        <td>${p.postanski_broj}</td>
+        <td>${p.naziv_poste}</td>
+        <td>${p.opcina_naziv}</td>
+        <td>${p.default_lokacija_naziv || 'Nema'}</td>
+        <td>
+          <button class="btn btn-sm" onclick="editPostalCode(${p.id})">✏️</button>
+          <button class="btn btn-sm btn-red" onclick="deletePostalCode(${p.id})">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+    renderPagination('postal-pagination', data.total, data.page, data.per_page, loadPostalCodes);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function openPostalCode(id = null) {
+  if (id) {
+    try {
+      const p = await api('GET', `/postal-codes/${id}`);
+      document.getElementById('postal-id').value = p.id;
+      document.getElementById('postal-opcina-id').value = p.opcina_id;
+      document.getElementById('postal-broj').value = p.postanski_broj;
+      document.getElementById('postal-naziv').value = p.naziv_poste;
+      document.getElementById('postal-default-lokacija').value = p.default_lokacija_id || '';
+      document.getElementById('modal-postal-title').textContent = 'Uredi poštanski kod';
+    } catch(e) { toast(e.message, 'error'); return; }
+  } else {
+    document.getElementById('postal-id').value = '';
+    document.getElementById('postal-opcina-id').value = '';
+    document.getElementById('postal-broj').value = '';
+    document.getElementById('postal-naziv').value = '';
+    document.getElementById('postal-default-lokacija').value = '';
+    document.getElementById('modal-postal-title').textContent = 'Novi poštanski kod';
+  }
+  await populatePostalOpcina();
+  await populatePostalLokacije();
+  openModal('modal-postal');
+}
+
+async function populatePostalOpcina() {
+  const opc = await api('GET', '/opcine');
+  const sel = document.getElementById('postal-opcina-id');
+  sel.innerHTML = opc.map(o => `<option value="${o.id}">${o.naziv}</option>`).join('');
+}
+
+async function populatePostalLokacije() {
+  const loks = await api('GET', '/lokacije');
+  const sel = document.getElementById('postal-default-lokacija');
+  sel.innerHTML = '<option value="">Nema</option>' + loks.map(l => `<option value="${l.id}">${l.naziv} (${l.opcina_naziv})</option>`).join('');
+}
+
+async function savePostalCode() {
+  const id = document.getElementById('postal-id').value;
+  const body = {
+    opcina_id: parseInt(document.getElementById('postal-opcina-id').value),
+    postanski_broj: document.getElementById('postal-broj').value.trim(),
+    naziv_poste: document.getElementById('postal-naziv').value.trim(),
+    default_lokacija_id: document.getElementById('postal-default-lokacija').value || null,
+  };
+  if (!body.opcina_id || !body.postanski_broj || !body.naziv_poste) { toast('Popunite sva obavezna polja', 'error'); return; }
+  try {
+    if (id) await api('PUT', `/postal-codes/${id}`, body);
+    else await api('POST', '/postal-codes', body);
+    closeModal('modal-postal');
+    toast('Poštanski kod spremljen ✓', 'success');
+    loadPostalCodes(postalPage);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deletePostalCode(id) {
+  if (!confirm('Jeste li sigurni da želite obrisati ovaj poštanski kod?')) return;
+  try {
+    await api('DELETE', `/postal-codes/${id}`);
+    toast('Poštanski kod obrisan ✓', 'success');
+    loadPostalCodes(postalPage);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  await Promise.all([refreshOpcinaSelects(), refreshLokacijaSelects(), refreshRasponSelects()]);
+  loadDashboard();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.add('hidden'); });
+});
+
+init();
+</script>
+</body>
+</html>

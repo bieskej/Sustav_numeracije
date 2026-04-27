@@ -1,0 +1,22 @@
+{
+  "mappings": [
+    {
+      "postal_office": "Banja Luka",
+      "municipality": "Banja Luka",
+      "region": "Republika Srpska"
+    },
+    {
+      "postal_office": "Bijeljina",
+      "municipality": "Bijeljina",
+      "region": "Republika Srpska"
+    },
+    {
+      "postal_office": "Brčko",
+      "municipality": "Brčko",
+      "region": "Brčko Distrikt"
+    }
+  ],
+  "defaults": {
+    "region": "Republika Srpska"
+  }
+}
