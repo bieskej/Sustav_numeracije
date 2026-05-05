@@ -1,0 +1,201 @@
+Evo detaljnog **prompta** koji možeš kopirati i poslati **Cursoru** (ili bilo kojem AI asistentu). Prompt objašnjava cijeli kontekst, tvoju postojeću aplikaciju, cilj, i korak-po-korak upute kako to implementirati.
+
+---
+
+```markdown
+# KONTEKST
+
+Ja imam postojeću FastAPI + PostgreSQL aplikaciju za upravljanje MSISDN numeracijom (brojevima). 
+Aplikacija ima sljedeću hijerarhiju: OPĆINA → LOKACIJA → UREĐAJ (MSAN/OLT) → RASPON → MSISDN brojevi.
+
+## Trenutne tabele (postojeće):
+- `opcine` (id, naziv)
+- `lokacije` (id, opcina_id, naziv, adresa)
+- `uredjaji` (id, lokacija_id, naziv, tip)  # tip = 'MSAN' ili 'OLT'
+- `rasponi` (id, uredjaj_id, pocetak_broj, kraj_broj, status)  # status: 'aktivan', 'neaktivan'
+- `msisdn` (id, raspon_id, broj, status, korisnik_ime, korisnik_prezime, korisnik_oib, datum_dodjele, datum_karantene)
+  # status: 'slobodan', 'zauzet', 'karantena'
+
+## Cilj aplikacije:
+Kada novi korisnik dođe na prodajno mjesto (koje pripada određenoj LOKACIJI → OPĆINI), 
+aplikacija treba automatski dodijeliti prvi slobodan broj iz raspona koji pripada toj općini.
+
+## Fokus:
+Samo HT Eronet (operator) i samo Republika Srpska (entitet).
+
+---
+
+# PODACI KOJE IMAŠ
+
+## 1. Dodijeljeni blokovi brojeva za HT Eronet (CSV fajl)
+
+```csv
+Vrsta usluge;NDC;Blok;Operator;Dužina broja (N(S)N)
+Fiksni;30;3049;HT d.d. Mostar;8
+Fiksni;30;3063;HT d.d. Mostar;8
+... (svi blokovi iz priloženog fajla)
+Mobilni;63;630;HT d.d. Mostar;8
+Mobilni;64;6440;HT d.d. Mostar;9
+```
+
+**Napomena:** NDC 30-39, 49, 50-59 su geografski NDC-ovi. 
+- NDC 50-59 pripadaju Republici Srpskoj.
+- NDC 30-39, 49 pripadaju Federaciji BiH (za sada ignoriramo).
+
+Plan numeriranja kaže:
+
+| NDC | Općina/Grad (RS) |
+|-----|------------------|
+| 50  | Mrkonjić Grad     |
+| 51  | Banja Luka        |
+| 52  | Prijedor          |
+| 53  | Doboj             |
+| 54  | Šamac             |
+| 55  | Bijeljina         |
+| 56  | Zvornik           |
+| 57  | Istočno Sarajevo  |
+| 58  | Foča              |
+| 59  | Trebinje          |
+
+## 2. HT Eronet dodijeljeni blokovi za RS (iz tvoje liste)
+
+Provjerom tvoje CSV liste za HT Eronet, u RS spadaju samo:
+
+| NDC | Blokovi (HT Eronet) |
+|-----|----------------------|
+| 51  | 5190                 |
+| 52  | (nema)               |
+| 53  | (nema)               |
+| 54  | (nema)               |
+| 55  | (nema)               |
+| 56  | (nema)               |
+| 57  | (nema)               |
+| 58  | (nema)               |
+| 59  | (nema)               |
+
+**Zaključak:** Za RS, HT Eronet ima samo **NDC 51 (Banja Luka)** i to blok **5190**. 
+To znači da su brojevi u obliku: `051 90xxx` (ukupno 1000 brojeva od 51900 do 51999? 
+Ček, BLok je 5190, dužina 8 = NDC(2) + blok(4) = 6, ostaju 2 cifre za SN? 
+Računamo: N(S)N = NDC(2) + blok(4) + SN(2) = 8 cifara. Znači od 519000 do 519099? 
+Treba provjeriti: Blok 5190 znači prvih 5 cifri su 05190, zadnje 3 cifre su slobodne? 
+Dužina 8: NDC 51 (2) + blok 90? Ne, blok je 5190 (4 cifre), znači 51 + 5190 = 6 cifri, ostaju 2 cifre (00-99) = 100 brojeva po bloku.
+
+## 3. Poštanski uredi u RS (iz priloženog PDF-a)
+
+Spisak poštanskih ureda Pošte Srpske. To su lokacije gdje se brojevi mogu dodjeljivati.
+Potrebno ih je ubačiti u tabelu `lokacije`, povezati sa odgovarajućom općinom.
+
+Primjer:
+- Poštanski broj 78101 → Banja Luka → općina "Banja Luka" (NDC 51)
+- Poštanski broj 79101 → Prijedor → općina "Prijedor" (NDC 52) - ali HT Eronet nema blok za Prijedor!
+- Poštanski broj 74101 → Doboj → općina "Doboj" (NDC 53) - nema HT Eronet bloka.
+
+---
+
+# ZADATAK ZA CURSOR
+
+Treba da implementiraš sljedeće:
+
+## 1. Import poštanskih ureda u bazu
+
+Kreiraj Python skriptu (npr. `import_postanskih_ureda.py`) koja:
+- Čita podatke iz priloženog teksta (spisak poštanskih ureda)
+- Za svaki poštanski ured odredi kojoj općini pripada (prema NDC mapiranju iznad)
+- Ubači podatke u tabele:
+  - Ako općina ne postoji u tabeli `opcine`, kreiraj je
+  - U tabelu `lokacije` ubaci: naziv = naziv pošte (npr. "Pošta Banja Luka"), adresa = mjesto, opcina_id = odgovarajući
+  - Poštanski broj spremi u novo polje `lokacije.postanski_broj` (treba dodati kolonu)
+
+**Napomena:** Za sada fokusiramo se samo na općine za koje HT Eronet ima dodijeljene blokove. 
+To je trenutno samo Banja Luka (NDC 51). Ostale općine preskačemo ili dodajemo kao lokacije bez numeracije.
+
+## 2. Import HT Eronet blokova u bazu
+
+Kreiraj skriptu `import_ht_blokova.py` koja:
+- Čita CSV sa HT Eronet blokovima
+- Za svaki red (NDC, Blok, Dužina) kreira raspon brojeva:
+  - Odredi općinu na osnovu NDC (samo za 51 - Banja Luka, ostali NDC za RS preskačemo jer ih HT nema)
+  - Pronađe ili kreira `uredjaj` (npr. "MSAN Banja Luka centrala") i `lokaciju`
+  - U tabelu `rasponi` ubaci: `pocetak_broj` = spoj NDC + Blok + "00" (prvi broj), `kraj_broj` = spoj NDC + Blok + "99" (zadnji), `uredjaj_id`, `status='aktivan'`
+  - Pozove `/rasponi/{id}/generiraj` da generiše pojedinačne brojeve u tabeli `msisdn` sa statusom 'slobodan'
+
+Primjer za blok 5190, NDC 51, dužina 8:
+- NDC=51 (2 cifre), blok=5190 (4 cifre), ostaju 2 cifre za SN (00-99)
+- `pocetak_broj` = "51519000" ? Ne, N(S)N = NDC + blok + SN = 51 + 5190 + 00 = 5151900? To je 7 cifara. Dužina je 8, znači fali jedna?
+- Provjera: 51 (2) + 5190 (4) = 6 fix. Dužina 8 → 2 varijabilne cifre = 00-99 (100 brojeva)
+- Format: 051 90 AB (gdje su AB 00-99). Broj za bazu: "5190AB" (bez vodeće nule) ili "05190AB"? 
+- Treba odlučiti: U bazi čuvamo N(S)N bez nacionalnog prefiksa (dakle bez vodeće 0). Znači "5190AB" (6 cifara?). Ne, "5190AB" je 6 cifara: 5,1,9,0,A,B. A i B su po 1 cifra → 6 cifara. Ali dužina N(S)N je 8! Kontradikcija.
+- Ispravak: NDC 51 je 2 cifre. Blok je "90"? Ili "5190"? U CSV piše "Blok = 5190". To je vjerovatno cijeli prefix nakon NDC. Znači broj = NDC(2) + blok(4) = 6 cifara. Dužina 8 znači dodaj još 2 cifre → 8 cifara ukupno. Dakle "51" + "5190" + "AB" = 51 5190 AB = 8 cifara. To je "515190AB". 
+- Znači početak = "51519000", kraj = "51519099". To je 100 brojeva.
+
+## 3. Endpoint za automatsku dodjelu broja
+
+Dodaj u `app/main.py` novi endpoint:
+
+```python
+@router.post("/dodijeli-broj")
+def dodijeli_broj(
+    opcina_naziv: str,
+    korisnik_ime: str,
+    korisnik_prezime: str,
+    korisnik_oib: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Automatski dodjeljuje prvi slobodan broj korisniku.
+    - Pronalazi općinu po nazivu
+    - Pronalazi sve aktivne raspone koji pripadaju toj općini (preko uredjaji → lokacije)
+    - Za svaki raspon redom, traži prvi slobodan MSISDN (status='slobodan')
+    - Kada ga nađe, ažurira njegov status na 'zauzet' i upisuje korisnikove podatke
+    - Vraća dodijeljeni broj
+    """
+    # Implementacija
+```
+
+## 4. Ažuriranje frontenda
+
+U `frontend/index.html` dodaj formu za unos:
+- Odabir općine (dropdown izvučen iz baze)
+- Ime, prezime, OIB
+- Dugme "Dodijeli broj" koje poziva gornji endpoint i prikazuje rezultat
+
+## 5. Dodatne validacije
+
+- OIB mora imati tačno 11 cifara
+- Ne može se isti OIB pojaviti dva puta sa statusom 'zauzet' (osim ako je stari broj vraćen u karantenu)
+- Karantena: kada se broj oslobodi (npr. korisnik raskine ugovor), status mu se postavi na 'karantena' na 30 dana, tek nakon toga ponovo postaje 'slobodan'
+
+---
+
+# KORACI IMPLEMENTACIJE (redoslijed)
+
+1. **Analiziraj postojeću bazu** - provjeri da li tabele imaju sve potrebne kolone (npr. `lokacije.postanski_broj`)
+2. **Dodaj migraciju** za `postanski_broj` u `lokacije` ako ne postoji
+3. **Napuni tabelu `opcine`** sa svim općinama iz RS koje imaju NDC (50-59)
+4. **Napuni `lokacije`** sa poštanskim uredima iz PDF-a (samo za Banja Luku za početak)
+5. **Napuni `uredjaji`** - kreiraj jedan fiktivni MSAN za Banja Luku (npr. "MSAN Banja Luka centrala")
+6. **Importuj HT Eronet blokove** u `rasponi` i generiši `msisdn` brojeve
+7. **Implementiraj endpoint `/dodijeli-broj`**
+8. **Testiraj** ručno kroz Swagger (`/docs`)
+9. **Ažuriraj frontend** sa formom
+
+---
+
+# PITANJA KOJA TREBA RAZJASNITI
+
+1. Da li je NDC 51 jedini koji HT Eronet ima u RS? (Prema tvojoj CSV listi, da. Nema blokova za 52,53,54,55,56,57,58,59)
+2. Kako postupiti ako prodajno mjesto nema nijedan raspon? (vratiti grešku "Nema slobodnih brojeva")
+3. Mobilni brojevi (NDC 63,64) - da li se i oni dodjeljuju na isti način? Ako da, oni nisu vezani za općinu (nomadski su), pa treba poseban endpoint za mobilne brojeve.
+
+---
+
+Očekujem da mi kao Cursor daš konkretne upute za implementaciju, uključujući:
+- SQL migracije (ALTER TABLE)
+- Python skripte za import
+- Nova koda za FastAPI endpoint
+- Ažurirani HTML/JS frontend
+```
+
+---
+
+Ovaj prompt možeš direktno kopirati i poslati Cursoru. On će na osnovu toga znati tačno šta treba da implementira, u kom redoslijedu, i sa kojim podacima.
