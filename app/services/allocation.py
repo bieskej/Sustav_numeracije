@@ -49,11 +49,8 @@ def allocate_number(conn: Connection, data: AllocationIn) -> AllocationOut:
         raise ValueError("Nema dostupnih raspona za ovu lokaciju")
 
     raspon_id = raspon_row["id"]
-    msisdn_od = raspon_row["msisdn_od"]
-    msisdn_do = raspon_row["msisdn_do"]
 
     # 3. Atomically claim the lowest slobodan MSISDN in that range
-    # Use SELECT FOR UPDATE to lock the row
     msisdn_row = conn.execute(
         """
         SELECT m.id, m.msisdn
@@ -75,10 +72,10 @@ def allocate_number(conn: Connection, data: AllocationIn) -> AllocationOut:
     conn.execute(
         """
         UPDATE msisdn_brojevi
-        SET status = 'zauzet', ime = %s, prezime = %s, oib = %s, napomena = %s, datum_dodjele = CURRENT_DATE
+        SET status = 'zauzet', ime = %s, prezime = %s, jmbg = %s, napomena = %s, datum_dodjele = CURRENT_DATE
         WHERE id = %s
         """,
-        (data.ime, data.prezime, data.oib, data.napomena, msisdn_id),
+        (data.ime, data.prezime, data.jmbg, data.napomena, msisdn_id),
     )
 
     # 4. Log assignment event
@@ -91,7 +88,7 @@ def allocate_number(conn: Connection, data: AllocationIn) -> AllocationOut:
         postal_code=data.postal_code,
         ime=data.ime,
         prezime=data.prezime,
-        oib=data.oib,
+        jmbg=data.jmbg,
         napomena=data.napomena,
     )
 

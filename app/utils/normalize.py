@@ -27,3 +27,13 @@ def digits_only(value: str) -> str:
         raise ValueError("Mora sadržavati samo znamenke")
     return v
 
+
+def strip_international_prefix(value: str) -> str:
+    """Strip +387 or 00387 BiH international prefix, returning the national number."""
+    v = (value or "").strip()
+    if v.startswith("+387"):
+        v = v[4:]
+    elif v.startswith("00387"):
+        v = v[5:]
+    return v
+

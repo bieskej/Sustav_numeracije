@@ -90,7 +90,7 @@ def update_msisdn(id: int, data: MsisdnUpdateIn, conn: Connection = Depends(db_d
         status=data.status,
         ime=data.ime,
         prezime=data.prezime,
-        oib=data.oib,
+        jmbg=data.jmbg,
         datum_dodjele=data.datum_dodjele,
         datum_karantene=data.datum_karantene,
         napomena=data.napomena,
@@ -113,7 +113,7 @@ def update_msisdn(id: int, data: MsisdnUpdateIn, conn: Connection = Depends(db_d
             lokacija_id=lokacija_id,
             ime=data.ime,
             prezime=data.prezime,
-            oib=data.oib,
+            jmbg=data.jmbg,
             napomena=data.napomena,
         )
 

@@ -316,6 +316,9 @@ th, td {
       <div class="nav-item" onclick="showPage('admin')" id="nav-admin">
         <span class="icon">⚙️</span> Admin
       </div>
+      <div class="nav-item" onclick="showPage('import')" id="nav-import">
+        <span class="icon">📥</span> Import CSV
+      </div>
     </div>
   </nav>
 <button id="theme-toggle" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
@@ -430,7 +433,7 @@ th, td {
         <button class="btn btn-primary" onclick="openMsisdn()">+ Dodaj broj</button>
         <div class="search-box">
           <span class="search-icon">🔍</span>
-          <input type="text" id="msisdn-search" placeholder="Pretraži broj, ime, OIB..." oninput="debouncedSearch()">
+          <input type="text" id="msisdn-search" placeholder="Pretraži broj, ime, JMBG..." oninput="debouncedSearch()">
         </div>
         <select id="filter-msisdn-raspon" onchange="loadMsisdn(1)">
           <option value="">Svi rasponi</option>
@@ -445,7 +448,7 @@ th, td {
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>MSISDN</th><th>Status</th><th>Ime i Prezime</th><th>OIB</th>
+            <th>Broj (+387)</th><th>Status</th><th>Ime i Prezime</th><th>JMBG</th>
             <th>Datum dodjele</th><th>Lokacija</th><th>Akcije</th>
           </tr></thead>
           <tbody id="tbl-msisdn"><tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr></tbody>
@@ -500,6 +503,25 @@ th, td {
         </table>
       </div>
       <div id="postal-pagination" class="pagination"></div>
+    </div>
+
+    <!-- IMPORT CSV -->
+    <div id="page-import" class="hidden">
+      <div class="page-header">
+        <h2>📥 Import CSV (RAK format)</h2>
+        <p>Uvoz dodijeljenih blokova iz RAK CSV datoteke (NDC;Blok;Operator;Dužina;Dodijeljeno)</p>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:520px">
+        <div class="form-row">
+          <label>CSV datoteka *</label>
+          <input type="file" id="csv-upload-file" accept=".csv,.txt" style="width:100%;padding:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px">
+          <div class="hint">Podržani formati: ; ili , delimiter, UTF-8 ili Latin-1 kodiranje</div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="uploadCsv()">📤 Uvezi</button>
+        <div id="csv-result" class="hidden" style="margin-top:16px;padding:12px;background:var(--surface2);border-radius:8px">
+          <span id="csv-result-text"></span>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -680,8 +702,8 @@ th, td {
           </div>
         </div>
         <div class="form-row">
-          <label>OIB</label>
-          <input type="text" id="msisdn-edit-oib" placeholder="11 znamenki" maxlength="11">
+          <label>JMBG</label>
+          <input type="text" id="msisdn-edit-jmbg" placeholder="13 cifara" maxlength="13">
           <div class="hint">Obvezno za zauzete brojeve</div>
         </div>
         <div class="form-grid">
@@ -809,8 +831,40 @@ function showPage(name) {
   document.getElementById('nav-' + name).classList.add('active');
   const loaders = { dashboard: loadDashboard, opcine: loadOpcine, lokacije: loadLokacije,
                     uredjaji: loadUredjaji, rasponi: loadRasponi, msisdn: () => loadMsisdn(1),
-                    allocation: () => {}, admin: () => loadPostalCodes(1) };
+                    allocation: () => {}, admin: () => loadPostalCodes(1), import: () => {} };
   if (loaders[name]) loaders[name]();
+}
+
+function formatBroj(msisdn) {
+  const s = String(msisdn);
+  if (s.length === 8) return `+387 ${s.slice(0,2)} ${s.slice(2,5)} ${s.slice(5)}`;
+  if (s.length === 9) return `+387 ${s.slice(0,2)} ${s.slice(2,6)} ${s.slice(6)}`;
+  return '+387 ' + s;
+}
+
+function stripPrefix387(v) {
+  v = (v || '').trim();
+  if (v.startsWith('+387')) v = v.slice(4);
+  else if (v.startsWith('00387')) v = v.slice(5);
+  return v.trim();
+}
+
+async function uploadCsv() {
+  const fileInput = document.getElementById('csv-upload-file');
+  if (!fileInput.files.length) { toast('Odaberite datoteku', 'error'); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  try {
+    const r = await fetch(API + '/import/csv-rak', { method: 'POST', body: formData });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Greška pri uvozu');
+    const errHtml = data.errors && data.errors.length
+      ? `<br><small style="color:var(--muted)">${data.errors.slice(0,5).join('; ')}</small>` : '';
+    document.getElementById('csv-result-text').innerHTML =
+      `✅ Uvezeno: <strong>${data.imported}</strong> blokova, preskočeno: ${data.skipped}${errHtml}`;
+    document.getElementById('csv-result').classList.remove('hidden');
+    toast(`Uvezeno ${data.imported} blokova`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function statusBadge(s) {
@@ -843,7 +897,12 @@ function debouncedSearch() {
 async function loadDashboard() {
   try {
     const s = await api('GET', '/statistike');
-    const pct = s.ukupno_msisdn ? Math.round(s.zauzeti / s.ukupno_msisdn * 100) : 0;
+    const iso = s.iskoristivost ?? 0;
+    const trend = s.iskoristivost_trend ?? 0;
+    const barColor = iso < 70 ? 'var(--green)' : iso < 85 ? 'var(--yellow)' : 'var(--red)';
+    const trendIcon = trend > 0 ? '▲' : trend < 0 ? '▼' : '—';
+    const trendColor = trend > 0 ? 'var(--red)' : trend < 0 ? 'var(--green)' : 'var(--muted)';
+    const trendStr = trend !== 0 ? `${trend > 0 ? '+' : ''}${trend}%` : '0%';
     document.getElementById('stats-grid').innerHTML = `
       <div class="stat-card blue"><div class="val">${s.opcine}</div><div class="lbl">🏛️ Općine</div></div>
       <div class="stat-card blue"><div class="val">${s.lokacije}</div><div class="lbl">📍 Lokacije</div></div>
@@ -853,7 +912,13 @@ async function loadDashboard() {
       <div class="stat-card green"><div class="val">${s.slobodni.toLocaleString()}</div><div class="lbl">🟢 Slobodni</div></div>
       <div class="stat-card red"><div class="val">${s.zauzeti.toLocaleString()}</div><div class="lbl">🔴 Zauzeti</div></div>
       <div class="stat-card yellow"><div class="val">${s.karantena.toLocaleString()}</div><div class="lbl">🟡 Karantena</div></div>
-      <div class="stat-card"><div class="val" style="color:var(--text)">${pct}%</div><div class="lbl">📊 Iskoristivost</div></div>
+      <div class="stat-card" style="min-width:160px">
+        <div class="val" style="color:${barColor}">${iso}%</div>
+        <div style="background:var(--surface2);border-radius:4px;height:8px;margin:6px 0 4px">
+          <div style="background:${barColor};height:8px;border-radius:4px;width:${Math.min(iso,100)}%;transition:width .5s"></div>
+        </div>
+        <div class="lbl">📊 Iskoristivost <span style="color:${trendColor};font-size:.75rem">${trendIcon} ${trendStr} (30d)</span></div>
+      </div>
     `;
   } catch(e) { toast('Greška pri učitavanju statistike', 'error'); }
 }
@@ -1220,10 +1285,10 @@ async function loadMsisdn(page) {
     if (!res.data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="icon">📱</div>Nema rezultata</div></td></tr>'; renderPagination(res); return; }
     tbody.innerHTML = res.data.map(m => `
       <tr>
-        <td style="font-family:monospace;font-weight:600">${m.msisdn}</td>
+        <td style="font-family:monospace;font-weight:600">${m.broj || formatBroj(m.msisdn)}</td>
         <td>${statusBadge(m.status)}</td>
         <td>${m.ime || m.prezime ? `${m.ime||''} ${m.prezime||''}`.trim() : '<span style="color:var(--muted)">—</span>'}</td>
-        <td style="font-family:monospace;font-size:.82rem">${m.oib || '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="font-family:monospace;font-size:.82rem">${m.jmbg || '<span style="color:var(--muted)">—</span>'}</td>
         <td style="color:var(--muted);font-size:.82rem">${m.datum_dodjele || '—'}</td>
         <td style="font-size:.82rem">${m.lokacija_naziv} <span style="color:var(--muted)">(${m.opcina_naziv})</span></td>
         <td class="actions-cell">
@@ -1264,7 +1329,7 @@ async function editMsisdn(id) {
     document.getElementById('msisdn-edit-status').value = m.status;
     document.getElementById('msisdn-edit-ime').value = m.ime || '';
     document.getElementById('msisdn-edit-prezime').value = m.prezime || '';
-    document.getElementById('msisdn-edit-oib').value = m.oib || '';
+    document.getElementById('msisdn-edit-jmbg').value = m.jmbg || '';
     document.getElementById('msisdn-edit-datum-dodjele').value = m.datum_dodjele || '';
     document.getElementById('msisdn-edit-datum-karantene').value = m.datum_karantene || '';
     document.getElementById('msisdn-edit-napomena').value = m.napomena || '';
@@ -1281,7 +1346,7 @@ async function saveMsisdn() {
     status,
     ime: document.getElementById('msisdn-edit-ime').value.trim() || null,
     prezime: document.getElementById('msisdn-edit-prezime').value.trim() || null,
-    oib: document.getElementById('msisdn-edit-oib').value.trim() || null,
+    jmbg: document.getElementById('msisdn-edit-jmbg').value.trim() || null,
     datum_dodjele: document.getElementById('msisdn-edit-datum-dodjele').value || null,
     datum_karantene: document.getElementById('msisdn-edit-datum-karantene').value || null,
     napomena: document.getElementById('msisdn-edit-napomena').value.trim() || null
@@ -1367,7 +1432,7 @@ async function allocateNumber() {
   const postal = document.getElementById('alloc-postal').value.trim();
   try {
     const result = await api('POST', '/assignments/allocate', { postal_code: postal });
-    document.getElementById('alloc-number').textContent = `Dodijeljen broj: ${result.msisdn} (${result.lokacija_naziv}, ${result.opcina_naziv}, ${result.region_naziv})`;
+    document.getElementById('alloc-number').textContent = `Dodijeljen broj: ${result.broj || formatBroj(result.msisdn)} (${result.lokacija_naziv}, ${result.opcina_naziv}, ${result.region_naziv})`;
     document.getElementById('alloc-result').classList.remove('hidden');
     document.getElementById('alloc-preview').classList.add('hidden');
     toast('Broj uspješno dodijeljen!', 'success');

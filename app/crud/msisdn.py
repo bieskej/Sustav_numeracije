@@ -23,7 +23,7 @@ def list_msisdn(
         params.append(status)
     if search:
         where.append(
-            "(CAST(m.msisdn AS TEXT) LIKE %s OR m.ime ILIKE %s OR m.prezime ILIKE %s OR m.oib LIKE %s)"
+            "(CAST(m.msisdn AS TEXT) LIKE %s OR m.ime ILIKE %s OR m.prezime ILIKE %s OR m.jmbg LIKE %s)"
         )
         s = f"%{search}%"
         params.extend([s, s, s, s])
@@ -89,7 +89,7 @@ def update_msisdn(
     status: str,
     ime: str | None,
     prezime: str | None,
-    oib: str | None,
+    jmbg: str | None,
     datum_dodjele: str | None,
     datum_karantene: str | None,
     napomena: str | None,
@@ -101,7 +101,7 @@ def update_msisdn(
             SET status=%s,
                 ime=NULL,
                 prezime=NULL,
-                oib=NULL,
+                jmbg=NULL,
                 datum_dodjele=NULL,
                 datum_karantene=NULL,
                 napomena=%s
@@ -117,17 +117,16 @@ def update_msisdn(
         SET status=%s,
             ime=%s,
             prezime=%s,
-            oib=%s,
+            jmbg=%s,
             datum_dodjele=%s::date,
             datum_karantene=%s::date,
             napomena=%s
         WHERE id=%s
         RETURNING *
         """,
-        (status, ime, prezime, oib, datum_dodjele, datum_karantene, napomena, id),
+        (status, ime, prezime, jmbg, datum_dodjele, datum_karantene, napomena, id),
     ).fetchone()
 
 
 def delete_msisdn(conn: Connection, id: int) -> int:
     return conn.execute("DELETE FROM msisdn_brojevi WHERE id=%s", (id,)).rowcount
-

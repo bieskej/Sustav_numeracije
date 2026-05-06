@@ -56,14 +56,14 @@ def create_assignment_event(
     postal_code: str | None = None,
     ime: str | None = None,
     prezime: str | None = None,
-    oib: str | None = None,
+    jmbg: str | None = None,
     napomena: str | None = None,
 ) -> dict:
     return conn.execute(
         """
-        INSERT INTO assignment_event (action, msisdn, raspon_id, lokacija_id, postal_code, ime, prezime, oib, napomena)
+        INSERT INTO assignment_event (action, msisdn, raspon_id, lokacija_id, postal_code, ime, prezime, jmbg, napomena)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *
         """,
-        (action, msisdn, raspon_id, lokacija_id, postal_code, ime, prezime, oib, napomena),
+        (action, msisdn, raspon_id, lokacija_id, postal_code, ime, prezime, jmbg, napomena),
     ).fetchone()

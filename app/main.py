@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,6 +14,8 @@ from app.core.database import Database, init_db
 from app.api import (
     assignments,
     deps,
+    health,
+    import_csv,
     lokacije,
     msisdn,
     opcine,
@@ -23,6 +26,7 @@ from app.api import (
     statistike,
     uredjaji,
 )
+from app.services.karantena_cleanup import run_karantena_cleanup
 
 
 FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
@@ -35,7 +39,33 @@ def create_app() -> FastAPI:
     db = Database(settings.database_url)
     init_db(db)
 
-    app = FastAPI(title="MSISDN Numeracija API (RS)", version="2.0.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            scheduler = BackgroundScheduler()
+            scheduler.add_job(
+                lambda: run_karantena_cleanup(db),
+                "cron",
+                hour=0,
+                minute=0,
+                id="karantena_cleanup",
+                replace_existing=True,
+            )
+            scheduler.start()
+        except Exception:
+            scheduler = None  # type: ignore[assignment]
+
+        yield
+
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+
+    app = FastAPI(
+        title="MSISDN Numeracija API (HT Eronet)",
+        version="2.1.0",
+        lifespan=lifespan,
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -56,6 +86,8 @@ def create_app() -> FastAPI:
     app.include_router(assignments.router)
     app.include_router(reports.router)
     app.include_router(statistike.router)
+    app.include_router(health.router)
+    app.include_router(import_csv.router)
 
     if FRONTEND_DIR.exists():
         app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
@@ -68,4 +100,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
