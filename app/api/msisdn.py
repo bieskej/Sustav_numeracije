@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from psycopg import Connection
 from psycopg.errors import UniqueViolation, ForeignKeyViolation
@@ -84,6 +86,13 @@ def update_msisdn(id: int, data: MsisdnUpdateIn, conn: Connection = Depends(db_d
     raspon_id = current["raspon_id"]
     msisdn = current["msisdn"]
 
+    # Auto-compute karantena expiry date when entering quarantine.
+    # datum_karantene is the DATE ON WHICH quarantine expires (not the start date).
+    datum_karantene = data.datum_karantene
+    if data.status == "karantena" and not datum_karantene:
+        expiry = datetime.date.today() + datetime.timedelta(days=data.karantena_trajanje_dana)
+        datum_karantene = expiry.isoformat()
+
     row = crud.update_msisdn(
         conn,
         id=id,
@@ -92,7 +101,7 @@ def update_msisdn(id: int, data: MsisdnUpdateIn, conn: Connection = Depends(db_d
         prezime=data.prezime,
         jmbg=data.jmbg,
         datum_dodjele=data.datum_dodjele,
-        datum_karantene=data.datum_karantene,
+        datum_karantene=datum_karantene,
         napomena=data.napomena,
     )
     if not row:

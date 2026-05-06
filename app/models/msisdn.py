@@ -42,6 +42,10 @@ class MsisdnUpdateIn(BaseModel):
     jmbg: str | None = None
     datum_dodjele: str | None = None
     datum_karantene: str | None = None
+    # How long the quarantine lasts in days; used to auto-compute datum_karantene
+    # when the status is set to 'karantena' and datum_karantene is not supplied.
+    # Default 180 days (≈ 6 months).
+    karantena_trajanje_dana: int = Field(default=180, ge=1, le=3650)
     napomena: str | None = Field(default=None, max_length=500)
 
     @field_validator("jmbg")

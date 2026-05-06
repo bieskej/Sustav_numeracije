@@ -712,9 +712,15 @@ th, td {
             <input type="date" id="msisdn-edit-datum-dodjele">
           </div>
           <div class="form-row" id="karantena-datum-wrap">
-            <label>Datum karantene</label>
+            <label>Istek karantene</label>
             <input type="date" id="msisdn-edit-datum-karantene">
+            <div class="hint">Ostavite prazno – automatski se izračuna po trajanju</div>
           </div>
+        </div>
+        <div class="form-row" id="karantena-trajanje-wrap">
+          <label>Trajanje karantene (dani)</label>
+          <input type="number" id="msisdn-karantena-trajanje" value="180" min="1" max="3650" oninput="previewKarantenaExpiry()">
+          <div class="hint" id="karantena-expiry-preview" style="color:var(--yellow)"></div>
         </div>
       </div>
       <div class="form-row">
@@ -1317,8 +1323,21 @@ function toggleMsisdnFields() {
   const status = document.getElementById('msisdn-edit-status').value;
   const fields = document.getElementById('msisdn-korisnik-fields');
   const karWrap = document.getElementById('karantena-datum-wrap');
+  const trajWrap = document.getElementById('karantena-trajanje-wrap');
   fields.style.display = status === 'slobodan' ? 'none' : '';
   karWrap.style.display = status === 'karantena' ? '' : 'none';
+  trajWrap.style.display = status === 'karantena' ? '' : 'none';
+  if (status === 'karantena') previewKarantenaExpiry();
+}
+
+function previewKarantenaExpiry() {
+  const manual = document.getElementById('msisdn-edit-datum-karantene').value;
+  const preview = document.getElementById('karantena-expiry-preview');
+  if (manual) { preview.textContent = ''; return; }
+  const days = parseInt(document.getElementById('msisdn-karantena-trajanje').value) || 180;
+  const expiry = new Date();
+  expiry.setDate(expiry.getDate() + days);
+  preview.textContent = `Istječe: ${expiry.toLocaleDateString('bs-BA', {day:'2-digit', month:'2-digit', year:'numeric'})}`;
 }
 
 async function editMsisdn(id) {
@@ -1332,6 +1351,7 @@ async function editMsisdn(id) {
     document.getElementById('msisdn-edit-jmbg').value = m.jmbg || '';
     document.getElementById('msisdn-edit-datum-dodjele').value = m.datum_dodjele || '';
     document.getElementById('msisdn-edit-datum-karantene').value = m.datum_karantene || '';
+    document.getElementById('msisdn-karantena-trajanje').value = 180;
     document.getElementById('msisdn-edit-napomena').value = m.napomena || '';
     toggleMsisdnFields();
     document.getElementById('modal-msisdn-title').textContent = `Uredi: ${m.msisdn}`;
@@ -1349,6 +1369,7 @@ async function saveMsisdn() {
     jmbg: document.getElementById('msisdn-edit-jmbg').value.trim() || null,
     datum_dodjele: document.getElementById('msisdn-edit-datum-dodjele').value || null,
     datum_karantene: document.getElementById('msisdn-edit-datum-karantene').value || null,
+    karantena_trajanje_dana: parseInt(document.getElementById('msisdn-karantena-trajanje').value) || 180,
     napomena: document.getElementById('msisdn-edit-napomena').value.trim() || null
   };
   try {

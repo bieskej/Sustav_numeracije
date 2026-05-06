@@ -39,7 +39,7 @@ def self_test(conn: Connection = Depends(db_dep)):
             SELECT COUNT(*)::int AS c FROM msisdn_brojevi
             WHERE status = 'karantena'
               AND datum_karantene IS NOT NULL
-              AND datum_karantene <= CURRENT_DATE - INTERVAL '30 days'
+              AND datum_karantene <= CURRENT_DATE
             """
         ).fetchone()["c"]
         checks["karantena_cleanup"] = expired == 0
