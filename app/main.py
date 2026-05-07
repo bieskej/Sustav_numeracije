@@ -94,7 +94,10 @@ def create_app() -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         def frontend_index() -> FileResponse:
-            return FileResponse(FRONTEND_DIR / "index.html")
+            return FileResponse(
+                FRONTEND_DIR / "index.html",
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
     return app
 
