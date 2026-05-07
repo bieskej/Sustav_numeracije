@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+"""Import HT Eronet MSISDN blocks from the official RAK Excel file.
+
+Source: Dodijeljeni blokovi brojeva_h 18-2-2026.xlsx
+        (RAK – Regulatorna agencija za komunikacije BiH)
+
+NDC→municipality mapping follows Plan brojeva za telefonske usluge u BiH
+(primjena 01.10.2017., source: 8e85c57b-fd57-4bf0-b0cf-4efae2f1bf09.pdf).
+"""
+
 import os
 from pathlib import Path
 
@@ -11,42 +20,82 @@ from app.utils.ndc_map import NDC_TO_MUNICIPALITY
 from app.utils.normalize import normalize_name
 
 
-def parse_csv(csv_path: Path) -> list[dict]:
-    """Parse CSV and return all HT Eronet blocks (FBiH + RS + mobile)."""
-    blocks = []
-    with open(csv_path, "r", encoding="utf-8-sig") as f:
-        for i, line in enumerate(f, 1):
-            if i == 1:
-                continue
-            parts = line.strip().split(";")
-            if len(parts) < 5:
-                continue
-            service_type, ndc, blok, operator, length_str = parts[:5]
-            if "HT" not in operator:
-                continue
+def parse_xlsx(xlsx_path: Path) -> list[dict]:
+    """Read all HT d.d. Mostar blocks from the RAK Excel allocation file.
+
+    Excel structure (row 7 = header, data starts row 14):
+      Col A: NDC  (merged cells – carries down)
+      Col B: Blok
+      Col C: Max N(S)N length
+      Col D: Min N(S)N length
+      Col E: Telekom operator
+      Col F: Dodatne informacije
+    """
+    try:
+        import openpyxl
+    except ImportError:
+        raise SystemExit("openpyxl is required: pip install openpyxl")
+
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    ws = wb.active
+
+    blocks: list[dict] = []
+    current_ndc: int | None = None
+    in_mobile_section = False
+
+    for row in ws.iter_rows(min_row=14, values_only=True):
+        # Column A carries NDC (merged cells – only set on first row of group)
+        if row[0] is not None:
+            current_ndc = row[0]
+
+        blok = row[1]
+        if blok is None or current_ndc is None:
+            continue
+
+        max_len = row[2]
+        min_len = row[3]
+        operator = str(row[4] or "").strip()
+        info = str(row[5] or "").strip()
+
+        # Only import HT d.d. Mostar blocks
+        if "HT" not in operator:
+            continue
+
+        length = max_len if max_len is not None else min_len
+        if not isinstance(length, int):
             try:
-                length = int(length_str.strip())
-            except ValueError:
+                length = int(length)
+            except (TypeError, ValueError):
                 continue
-            blocks.append(
-                {
-                    "service_type": service_type.strip(),
-                    "ndc": ndc.strip(),
-                    "blok": blok.strip(),
-                    "operator": operator.strip(),
-                    "length": length,
-                }
-            )
+
+        # Determine service type: mobile section header in Excel reads
+        # "MOBILNI TELEFONSKI SERVISI" in col A
+        ndc_str = str(current_ndc)
+        is_mobile = ndc_str in ("63", "64")
+
+        blocks.append(
+            {
+                "service_type": "Mobilni" if is_mobile else "Fiksni",
+                "ndc": ndc_str,
+                "blok": str(blok),
+                "operator": operator,
+                "length": length,
+            }
+        )
+
     return blocks
 
 
-def generate_msisdn_range(ndc: str, blok: str, length: int) -> tuple[int, int]:
-    """Calculate msisdn_od / msisdn_do for a given NDC + block + N(S)N length."""
-    prefix = ndc + blok
-    remaining = length - len(prefix)
+def generate_msisdn_range(blok: str, length: int) -> tuple[int, int]:
+    """Calculate msisdn_od / msisdn_do for a given block + N(S)N length.
+
+    The blok value from the RAK Excel already includes the NDC as its leading
+    digits (e.g., NDC=30, blok=3049 → prefix "3049", range 30490000–30499999).
+    """
+    remaining = length - len(blok)
     if remaining < 0:
-        raise ValueError(f"Prefix '{prefix}' duži od dužine {length}")
-    return int(prefix + "0" * remaining), int(prefix + "9" * remaining)
+        raise ValueError(f"Blok '{blok}' duži od dužine {length}")
+    return int(blok + "0" * remaining), int(blok + "9" * remaining)
 
 
 def main() -> None:
@@ -55,15 +104,15 @@ def main() -> None:
     if not db_url:
         raise SystemExit("DATABASE_URL is required")
 
-    csv_path = Path("deepseek_csv_20260504_e8f099.txt")
-    if not csv_path.exists():
-        raise SystemExit(f"CSV file not found: {csv_path}")
+    xlsx_path = Path("Dodijeljeni blokovi brojeva_h 18-2-2026.xlsx")
+    if not xlsx_path.exists():
+        raise SystemExit(f"Excel file not found: {xlsx_path}")
 
-    blocks = parse_csv(csv_path)
+    blocks = parse_xlsx(xlsx_path)
     if not blocks:
-        raise SystemExit("No HT Eronet blocks found in CSV")
+        raise SystemExit("No HT Eronet blocks found in Excel file")
 
-    print(f"Found {len(blocks)} HT Eronet blocks")
+    print(f"Pronađeno {len(blocks)} HT Eronet blokova u Excel datoteci")
 
     db = Database(db_url)
     init_db(db)
@@ -143,13 +192,13 @@ def main() -> None:
 
                 # Range
                 try:
-                    msisdn_od, msisdn_do = generate_msisdn_range(ndc, block["blok"], block["length"])
+                    msisdn_od, msisdn_do = generate_msisdn_range(block["blok"], block["length"])
                 except ValueError as e:
                     print(f"  Preskočeno NDC {ndc} blok {block['blok']}: {e}")
                     skipped_unknown += 1
                     continue
 
-                tip = "mobilni" if "mobil" in block["service_type"].lower() else "geografski"
+                tip = "mobilni" if block["service_type"] == "Mobilni" else "geografski"
 
                 # Insert into dodijeljeni_blok (regulatory record)
                 conn.execute(
@@ -195,12 +244,12 @@ def main() -> None:
                 imported += 1
 
     total_numbers = sum(
-        10 ** (b["length"] - len(b["ndc"] + b["blok"]))
+        10 ** (b["length"] - len(b["blok"]))
         for b in blocks
-        if NDC_TO_MUNICIPALITY.get(b["ndc"]) and b["length"] > len(b["ndc"] + b["blok"])
+        if NDC_TO_MUNICIPALITY.get(b["ndc"]) and b["length"] > len(b["blok"])
     )
-    print(f"\nUvezeno raspona: {imported}")
-    print(f"Preskočeno (overlap): {skipped_overlap}")
+    print(f"\nUvezeno raspona:           {imported}")
+    print(f"Preskočeno (overlap):      {skipped_overlap}")
     print(f"Preskočeno (nepoznati NDC): {skipped_unknown}")
     print(f"Ukupno generiranih MSISDN: ~{total_numbers:,}")
 

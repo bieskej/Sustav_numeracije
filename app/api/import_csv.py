@@ -119,11 +119,12 @@ async def import_csv_rak(
             skipped += 1
             continue
 
-        prefix = ndc + blok
+        # blok already includes the NDC as its leading digits
+        prefix = blok
         remaining = length - len(prefix)
         if remaining < 0:
             skipped += 1
-            errors.append(f"Red {i}: prefix '{prefix}' duži od dužine {length}")
+            errors.append(f"Red {i}: blok '{blok}' duži od dužine {length}")
             continue
 
         msisdn_od = int(prefix + "0" * remaining)
