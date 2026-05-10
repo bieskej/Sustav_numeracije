@@ -253,6 +253,9 @@
       <div class="nav-item" onclick="showPage('import')" id="nav-import">
         <span class="icon">📥</span> Import CSV
       </div>
+      <div class="nav-item" onclick="showPage('historija')" id="nav-historija">
+        <span class="icon">📋</span> Historija
+      </div>
     </div>
   </nav>
 <button id="theme-toggle" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
@@ -457,6 +460,38 @@
         </div>
       </div>
     </div>
+
+    <!-- HISTORIJA ALOKACIJA -->
+    <div id="page-historija" class="hidden">
+      <div class="page-header">
+        <h2>📋 Historija alokacija</h2>
+        <p>Pregled svih dodjela, oslobađanja i karantena</p>
+      </div>
+      <div class="toolbar">
+        <select id="filter-hist-action" onchange="loadHistorija(1)">
+          <option value="">Sve akcije</option>
+          <option value="allocated">Dodijeljen</option>
+          <option value="released">Oslobođen</option>
+          <option value="quarantine">Karantena</option>
+        </select>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="filter-hist-postal" placeholder="Poštanski broj..." oninput="debouncedSearchHistorija()">
+        </div>
+        <button class="btn btn-ghost" onclick="resetHistorijaFilters()">Resetuj</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Datum/Vrijeme</th><th>Akcija</th><th>MSISDN</th>
+            <th>Ime i Prezime</th><th>Poštanski broj</th><th>Lokacija</th><th>Napomena</th>
+          </tr></thead>
+          <tbody id="tbl-historija"><tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+      <div id="hist-pagination" class="pagination"></div>
+    </div>
+
   </main>
 </div>
 
@@ -771,8 +806,75 @@ function showPage(name) {
   document.getElementById('nav-' + name).classList.add('active');
   const loaders = { dashboard: loadDashboard, opcine: loadOpcine, lokacije: loadLokacije,
                     uredjaji: loadUredjaji, rasponi: loadRasponi, msisdn: () => loadMsisdn(1),
-                    allocation: () => {}, admin: () => loadPostalCodes(1), import: () => {} };
+                    allocation: () => {}, admin: () => loadPostalCodes(1), import: () => {},
+                    historija: () => loadHistorija(1) };
   if (loaders[name]) loaders[name]();
+}
+
+// ── HISTORIJA ALOKACIJA ──────────────────────────────────────────────────────
+
+let histPage = 1;
+let histSearchTimer = null;
+
+function debouncedSearchHistorija() {
+  clearTimeout(histSearchTimer);
+  histSearchTimer = setTimeout(() => loadHistorija(1), 300);
+}
+
+function resetHistorijaFilters() {
+  document.getElementById('filter-hist-action').value = '';
+  document.getElementById('filter-hist-postal').value = '';
+  loadHistorija(1);
+}
+
+function actionBadge(action) {
+  const map = {
+    allocated:  ['badge-green',  'Dodijeljen'],
+    released:   ['badge-blue',   'Oslobođen'],
+    quarantine: ['badge-yellow', 'Karantena'],
+  };
+  const [cls, label] = map[action] || ['badge-purple', action];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+async function loadHistorija(page) {
+  histPage = page;
+  const action = document.getElementById('filter-hist-action').value;
+  const postal = document.getElementById('filter-hist-postal').value.trim();
+  let url = `/reports/allocations?page=${page}&per_page=50`;
+  if (action) url += `&action=${encodeURIComponent(action)}`;
+  if (postal) url += `&postal_code=${encodeURIComponent(postal)}`;
+  try {
+    const data = await api('GET', url);
+    const tbody = document.getElementById('tbl-historija');
+    if (!data.data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Nema podataka</td></tr>';
+      document.getElementById('hist-pagination').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = data.data.map(e => {
+      const dt = new Date(e.timestamp).toLocaleString('hr');
+      const ime = [e.ime, e.prezime].filter(Boolean).join(' ') || '—';
+      return `<tr>
+        <td style="white-space:nowrap">${dt}</td>
+        <td>${actionBadge(e.action)}</td>
+        <td><code>${formatBroj(e.msisdn)}</code></td>
+        <td>${ime}</td>
+        <td>${e.postal_code || '—'}</td>
+        <td>${e.lokacija_naziv || '—'}</td>
+        <td style="color:var(--muted)">${e.napomena || '—'}</td>
+      </tr>`;
+    }).join('');
+    const pages = Math.ceil(data.total / data.per_page);
+    const pel = document.getElementById('hist-pagination');
+    if (pages <= 1) { pel.innerHTML = ''; return; }
+    let ph = `<button onclick="loadHistorija(${data.page-1})" ${data.page<=1?'disabled':''}>‹ Preth.</button>`;
+    for (let p = Math.max(1, data.page-2); p <= Math.min(pages, data.page+2); p++)
+      ph += `<button class="${p===data.page?'active':''}" onclick="loadHistorija(${p})">${p}</button>`;
+    ph += `<button onclick="loadHistorija(${data.page+1})" ${data.page>=pages?'disabled':''}>Sljed. ›</button>`;
+    ph += `<span class="info">Ukupno: ${data.total.toLocaleString()} zap.</span>`;
+    pel.innerHTML = ph;
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function formatBroj(msisdn) {
@@ -888,7 +990,7 @@ async function loadOpcine() {
 function openOpcina() {
   document.getElementById('opcina-id').value = '';
   document.getElementById('opcina-naziv').value = '';
-  document.getElementById('opcina-region-id').value = '1'; // Default RS
+  document.getElementById('opcina-region-id').value = '1';
   document.getElementById('modal-opcina-title').textContent = 'Nova općina';
   openModal('modal-opcina');
 }
@@ -1372,7 +1474,6 @@ async function resolveLocation() {
   const postal = document.getElementById('alloc-postal').value.trim();
   if (!postal) { toast('Unesite poštanski broj', 'error'); return; }
   try {
-    // To resolve, we can use the postal codes API to find the default location
     const codes = await api('GET', `/postal-codes?search=${encodeURIComponent(postal)}`);
     const code = codes.data.find(c => c.postanski_broj === postal);
     if (!code) { toast('Poštanski broj nije pronađen', 'error'); return; }
